@@ -15,6 +15,10 @@ def get_scenario(db,sid):
 def create_scenario(db,data,user):
     run=db.get(AttributionRun,data.run_id)
     if not run or run.status!="completed":raise HTTPException(409,"必须选已完成归因研究")
+    if not run.result.get("budget_eligible",False):
+        legacy=run.result.get("method_version") is None
+        if legacy:raise HTTPException(409,"该研究按旧口径（v1，直接转化摊入渠道）计算，仅保留原值供查阅，不能基于它新建预算情景")
+        raise HTTPException(409,"该研究没有带触点转化（全直接路径），无渠道关联得分，不生成预算建议")
     try:optimize_budget(run.result['credits'],data.budget,data.capacity_overrides)
     except ValueError as e:raise HTTPException(422,str(e))
     row=BudgetScenario(**data.model_dump(),owner=user.name)

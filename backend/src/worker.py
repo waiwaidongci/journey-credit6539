@@ -25,7 +25,9 @@ while True:
                 batch=db.get(JourneyBatch,row.batch_id)
                 row.result=analyze_attribution(batch,list_journeys(db,batch.id),list_channels(db))
             else:
-                run=db.get(AttributionRun,row.run_id);result=optimize_budget(run.result['credits'],row.budget,row.capacity_overrides)
+                run=db.get(AttributionRun,row.run_id)
+                if not run.result.get("budget_eligible",False):raise ValueError("该归因研究无带触点转化或为旧口径结果，不生成预算建议")
+                result=optimize_budget(run.result['credits'],row.budget,row.capacity_overrides)
                 result['input_hash']=fingerprint({"method":"linear-association-budget-v1","attribution":run.result,"budget":row.budget,"capacity_overrides":row.capacity_overrides})
                 result['attribution_hash']=run.result['input_hash'];row.result=result
             row.status=RunStatus.COMPLETED;Path(f"/artifacts/{kind}-{row.id}.json").write_text(json.dumps(row.result,ensure_ascii=False));log(db,"worker",kind+".completed",row.id)

@@ -34,5 +34,31 @@ def seed():
             scenario_result=optimize_budget(result['credits'],5000.,{})
             scenario_result['input_hash']=fingerprint({"method":"linear-association-budget-v1","attribution":result,"budget":5000.,"capacity_overrides":{}});scenario_result['attribution_hash']=result['input_hash']
             db.add(BudgetScenario(name="首周五千元讨论情景",run_id=run.id,budget=5000.,capacity_overrides={},status="completed",review_status="approved",result=scenario_result,owner="许晴 · 路径研究员",reviewer="陈照 · 传播负责人",review_note="批准研究情景归档；关联得分不是因果ROI，不代表真实预约预测，不自动投放。"))
+        # v2 拆分口径演示批次：混合（直接+循环）与全直接；原两批次及已有结果保持原值。
+        demo_batches=[
+            ("巡光秋展 · 混合直接与循环路径",[
+                ([],True,24),([],False,10),
+                (['SEARCH'],True,18),(['COMMUNITY','SEARCH'],True,14),
+                (['POSTER','NEWSLETTER','POSTER'],True,12),(['CREATOR','PARTNER','CREATOR'],False,16),
+                (['COMMUNITY','COMMUNITY','SEARCH'],True,10),(['PARTNER'],False,12),
+            ]),
+            ("巡光秋展 · 全直接路径批次",[
+                ([],True,36),([],False,14),
+            ]),
+        ]
+        for batch_name,plan in demo_batches:
+            if db.query(AttributionRun).filter_by(name=batch_name+" · 归因研究").first():continue
+            batch=db.query(JourneyBatch).filter_by(name=batch_name).first()
+            if not batch:
+                batch=JourneyBatch(name=batch_name,source="xg-exhibition-paths.json",description="v2拆分口径演示：直接预约（无触点）单列，带触点路径保留循环；全直接批次不生成预算建议。")
+                db.add(batch);db.flush()
+            existing=set(x[0] for x in db.query(Journey.code).filter_by(batch_id=batch.id))
+            for path,converted,n in plan:
+                for _ in range(n):
+                    index+=1;code=f"XG-{index:05d}"
+                    if code not in existing:db.add(Journey(code=code,batch_id=batch.id,path=list(path),converted=converted,note="匿名合成路径，触点顺序保留；终点根据预约观察窗口记录。"))
+            db.flush()
+            result=analyze_attribution(batch,list_journeys(db,batch.id),list_channels(db))
+            db.add(AttributionRun(name=batch_name+" · 归因研究",batch_id=batch.id,status="completed",result=result,owner="许晴 · 路径研究员"))
         db.commit();print(json.dumps({m.__tablename__:db.query(m).count() for m in [User,Channel,JourneyBatch,Journey,AttributionRun,BudgetScenario]},ensure_ascii=False))
 if __name__=="__main__":seed()

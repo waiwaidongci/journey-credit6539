@@ -17,3 +17,14 @@ def transition_matrix(journeys,channel_codes):
         elif counts[i].sum()>0:probabilities[i]=counts[i]/counts[i].sum()
         else:probabilities[i,index['NULL']]=1
     return states,counts,probabilities
+
+def direct_only_matrix(channel_codes):
+    """无任何带触点路径（全直接批次）时的退化矩阵：START只转NULL，渠道不可达。"""
+    if not channel_codes or len(set(channel_codes))!=len(channel_codes) or set(channel_codes)&{'START','CONVERSION','NULL'}:raise ValueError("渠道标识重复、为空或占用保留状态")
+    states=['START']+sorted(channel_codes)+['CONVERSION','NULL'];index={s:i for i,s in enumerate(states)}
+    counts=np.zeros((len(states),len(states)),dtype=float)
+    probabilities=np.zeros_like(counts)
+    for i,state in enumerate(states):
+        if state in ['CONVERSION','NULL']:probabilities[i,i]=1
+        else:probabilities[i,index['NULL']]=1
+    return states,counts,probabilities
